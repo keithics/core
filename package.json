@@ -1,7 +1,7 @@
 {
   "name": "@keithics/core",
   "version": "3.0.1",
-  "description": "Signalytics Common libraries",
+  "description": "Common libraries",
   "main": "index.js",
   "scripts": {
     "test": "NODE_PATH=./src ./node_modules/.bin/jest --coverage --verbose --runInBand --forceExit --detectOpenHandles",
