@@ -1,6 +1,6 @@
 {
   "name": "@keithics/core",
-  "version": "2.0.13",
+  "version": "3.0.0",
   "description": "Signalytics Common libraries",
   "main": "index.js",
   "scripts": {
