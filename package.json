@@ -1,6 +1,6 @@
 {
   "name": "@keithics/core",
-  "version": "6.3",
+  "version": "6.3.0",
   "description": "Common libraries",
   "main": "index.js",
   "scripts": {
