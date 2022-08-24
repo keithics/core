@@ -1,6 +1,6 @@
 import globalPrefs from './global-preferences';
 import { catchAsync } from '@keithics/errors/lib/catch-async';
-import { assert, ErrorNotFound, ErrorOther } from '@keithics/errors/lib/assert';
+import { arkAssert, ArkErrorNotFound, ArkErrorOther } from '@keithics/errors/lib/ark.assert';
 
 /**
  * As much as possible don't update this class
@@ -38,6 +38,10 @@ class CoreCrudController {
   /** set to true, will query all data regardless of who created it **/
   protected isAdmin = false;
 
+  /** valid search keys list **/
+  protected validFilterKeys: string[] = ['name'];
+  protected validSearchFilterKeys: string[] = ['name'];
+
   /***
    * Count data of {@link model}
    * @param req Express Request
@@ -73,7 +77,7 @@ class CoreCrudController {
    **/
   public create = catchAsync(async (req, res) => {
     const data = await this.model.create({ ...req.body, user: req.user });
-    assert(data, ErrorOther);
+    arkAssert(data, ArkErrorOther);
     res.jsonp(data);
   });
 
@@ -85,8 +89,8 @@ class CoreCrudController {
    **/
   public read = catchAsync(async (req, res) => {
     const currentUser = this.isAdmin ? null : { user: req.user };
-    const data = await this.model.findOne({ _id: req.params.id, ...currentUser }, this.fields);
-    assert(data, ErrorNotFound);
+    const data = await this.model.findOne({ _id: req.params.id, ...currentUser }, this.fields).populate(this.populated);
+    arkAssert(data, ArkErrorNotFound);
     res.jsonp(data);
   });
 
@@ -104,9 +108,9 @@ class CoreCrudController {
         ...currentUser,
       },
       { ...req.body, ...currentUser },
-      { new: true, overwrite: true }
+      { new: true }
     );
-    assert(data, ErrorNotFound);
+    arkAssert(data, ArkErrorNotFound);
     res.jsonp(data);
   });
 
@@ -119,7 +123,75 @@ class CoreCrudController {
   public delete = catchAsync(async (req, res) => {
     const currentUser = this.isAdmin ? null : { user: req.user };
     const data = await this.model.findOneAndRemove({ _id: req.params.id, ...currentUser });
-    assert(data, ErrorNotFound);
+    arkAssert(data, ArkErrorNotFound);
+    res.jsonp(data);
+  });
+
+  private checkKeys(a1: string[], a2: string[]) {
+    a1.forEach(function (a) {
+      arkAssert(!a2.includes(a), ArkErrorOther, 'Invalid Keys');
+    });
+  }
+
+  public filter = catchAsync(async (req, res) => {
+    const { page = 1, sort = { createdAt: -1 }, limit = this.limit, filters } = req.body;
+    const filtersKeys = filters.map((f) => f.key);
+
+    this.checkKeys(this.validFilterKeys, filtersKeys);
+
+    const aSort = sort ? sort : this.sortFirstPaginate ? this.sort : { createdAt: -1 };
+    const currentUser = this.isAdmin ? null : { user: req.user };
+    const filter = filters.reduce((obj, item) => Object.assign(obj, { [item.key]: item.value }), {});
+
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const data = await this.model.paginate(
+      { ...filter, ...currentUser },
+      {
+        page,
+        sort: aSort,
+        limit,
+        populate: this.populated,
+      }
+    );
+    res.jsonp(data);
+  });
+
+  public search = catchAsync(async (req, res) => {
+    const { key, value } = req.body;
+
+    const regex = {
+      [key]: {
+        $regex: value,
+      },
+    };
+
+    const data = await this.model
+      .find({ ...regex })
+      .populate(this.populated)
+      .limit(globalPrefs.paginationLimit);
+    res.jsonp(data);
+  });
+
+  public searchFilter = catchAsync(async (req, res) => {
+    const { key, value, filters } = req.body;
+
+    const filtersKeys = filters.map((f) => f.key);
+    this.checkKeys(this.validSearchFilterKeys, filtersKeys);
+
+    const filter = filters.reduce((obj, item) => Object.assign(obj, { [item.key]: item.value }), {});
+
+    const currentUser = this.isAdmin ? null : { user: req.user };
+    const regex = {
+      [key]: {
+        $regex: value,
+      },
+    };
+
+    const data = await this.model
+      .find({ ...regex, ...filter, user: currentUser.user._id })
+      .populate(this.populated)
+      .limit(globalPrefs.paginationLimit);
     res.jsonp(data);
   });
 }
